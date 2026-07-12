@@ -132,5 +132,44 @@ def enroll(request, course_id):
         # Calculate the total score
 #def show_exam_result(request, course_id, submission_id):
 
+def submit(request, course_id):
+    course = get_object_or_404(Course, pk=course_id)
+    if request.method == 'POST':
+        enrollment = Enrollment.objects.get(user=request.user, course=course)
+        submission = Submission.objects.create(enrollment=enrollment)
+        
+        for question in course.question_set.all():
+            selected_choice_id = request.POST.get(f'choice_{question.id}')
+            if selected_choice_id:
+                selected_choice = Choice.objects.get(pk=selected_choice_id)
+                submission.choices.add(selected_choice)
+        
+        submission.save()
+        return redirect('onlinecourse:show_exam_result', course_id=course.id, submission_id=submission.id)
+    
+    return render(request, 'onlinecourse/course_detail_bootstrap.html', {'course': course})
+
+def show_exam_result(request, course_id, submission_id):
+    course = get_object_or_404(Course, pk=course_id)
+    submission = get_object_or_404(Submission, pk=submission_id)
+    
+    score = 0
+    total_grade = 0
+    for question in course.question_set.all():
+        total_grade += question.grade
+        selected_choice = submission.choices.filter(question=question).first()
+        if selected_choice and selected_choice.is_correct:
+            score += question.grade
+            
+    passed = score >= (total_grade * 0.8) if total_grade > 0 else False
+            
+    context = {
+        'course': course,
+        'submission': submission,
+        'score': score,
+        'total_grade': total_grade,
+        'passed': passed
+    }
+    return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
 
 
